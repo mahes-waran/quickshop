@@ -1,0 +1,27 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: trivy-scan
+  namespace: cicd
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: SEVERITY
+      type: string
+      default: "CRITICAL,HIGH"
+    - name: EXIT_CODE
+      type: string
+      default: "1"          # fail the pipeline if matching vulnerabilities are found
+  steps:
+    - name: trivy-scan
+      image: aquasec/trivy:0.54.1
+      script: |
+        #!/bin/sh
+        set -e
+        trivy image \
+          --severity $(params.SEVERITY) \
+          --exit-code $(params.EXIT_CODE) \
+          --ignore-unfixed \
+          --format table \
+          $(params.IMAGE)

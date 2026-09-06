@@ -1,0 +1,40 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: build-and-push
+  namespace: cicd
+spec:
+  params:
+    - name: IMAGE
+      type: string
+      description: Full image ref, e.g. docker.io/myorg/myapp:latest
+    - name: DOCKERFILE
+      type: string
+      default: ./app/Dockerfile
+    - name: CONTEXT
+      type: string
+      default: ./app
+  workspaces:
+    - name: source
+  steps:
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: DOCKER_CONFIG
+          value: /kaniko/.docker
+      args:
+        - --dockerfile=$(params.DOCKERFILE)
+        - --context=$(workspaces.source.path)/$(params.CONTEXT)
+        - --destination=$(params.IMAGE)
+        - --cache=true
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: registry-credentials
+        items:
+          - key: .dockerconfigjson
+            path: config.json

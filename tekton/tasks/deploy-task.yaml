@@ -1,0 +1,42 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy-to-k8s
+  namespace: cicd
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: NAMESPACE
+      type: string
+      default: demo-app
+    - name: DEPLOYMENT_NAME
+      type: string
+      default: devops-demo-app
+  workspaces:
+    - name: source
+  steps:
+    - name: deploy
+      image: bitnami/kubectl:1.30
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: KUBECONFIG
+          value: /kubeconfig/kubeconfig
+      volumeMounts:
+        - name: kubeconfig-vol
+          mountPath: /kubeconfig
+      script: |
+        #!/bin/bash
+        set -e
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/deployment.yaml -n $(params.NAMESPACE)
+        kubectl apply -f k8s/service.yaml -n $(params.NAMESPACE)
+        kubectl apply -f k8s/ingress.yaml -n $(params.NAMESPACE)
+        kubectl apply -f k8s/hpa.yaml -n $(params.NAMESPACE)
+        kubectl set image deployment/$(params.DEPLOYMENT_NAME) \
+          app=$(params.IMAGE) -n $(params.NAMESPACE)
+        kubectl rollout status deployment/$(params.DEPLOYMENT_NAME) -n $(params.NAMESPACE) --timeout=120s
+  volumes:
+    - name: kubeconfig-vol
+      secret:
+        secretName: kubeconfig-secret
